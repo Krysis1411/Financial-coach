@@ -81,7 +81,7 @@ export type FinancialData = {
 };
 
 export type AgentState = {
-  financial_data: FinancialData;
+  "user:financial_data": FinancialData;
   budget_analysis?: BudgetAnalysis;
   savings_strategy?: SavingsStrategy;
   debt_reduction?: DebtReduction;
