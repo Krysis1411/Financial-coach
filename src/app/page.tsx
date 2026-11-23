@@ -54,7 +54,7 @@ function MainContent() {
   const { state, setState, running } = useCoAgent<AgentState>({
     name: "my_agent",
     initialState: {
-      financial_data: DEFAULT_FINANCIAL_DATA,
+      "user:financial_data": DEFAULT_FINANCIAL_DATA,
     },
   });
 
@@ -135,7 +135,7 @@ function MainContent() {
   });
 
   const financialData: FinancialData =
-    state?.financial_data ?? DEFAULT_FINANCIAL_DATA;
+    state?.["user:financial_data"] ?? DEFAULT_FINANCIAL_DATA;
 
   const hasReport =
     !!state?.budget_analysis ||
@@ -179,7 +179,7 @@ function MainContent() {
           <FinancialForm
             data={financialData}
             onChange={(next) =>
-              setState({ ...(state ?? {}), financial_data: next })
+              setState({ ...(state ?? {}), "user:financial_data": next })
             }
             onAnalyze={handleAnalyze}
             isAnalyzing={!!running}

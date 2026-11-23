@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from typing import Any, Dict, List, Optional
 
+from ag_ui.core import RunAgentInput
 from ag_ui_adk import ADKAgent, add_adk_fastapi_endpoint
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from google.adk.agents import LlmAgent, SequentialAgent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
+from google.adk.sessions import DatabaseSessionService
 from google.adk.tools import AgentTool, ToolContext
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -108,11 +113,14 @@ DEFAULT_FINANCIAL_DATA: Dict[str, Any] = {
     "debts": [],
 }
 
+# "user:" prefix makes the profile persist across sessions for the same user.
+FINANCIAL_DATA_KEY = "user:financial_data"
+
 
 def on_before_agent(callback_context: CallbackContext):
-    """Initialize financial_data in shared state if missing."""
-    if "financial_data" not in callback_context.state:
-        callback_context.state["financial_data"] = dict(DEFAULT_FINANCIAL_DATA)
+    """Initialize the user's financial profile in shared state if missing."""
+    if FINANCIAL_DATA_KEY not in callback_context.state:
+        callback_context.state[FINANCIAL_DATA_KEY] = dict(DEFAULT_FINANCIAL_DATA)
     return None
 
 
@@ -126,7 +134,7 @@ def _safe_dumps(value: Any) -> str:
 def _state_context(state, include_keys: List[str]) -> str:
     """Render selected state slices as a readable context block."""
     blocks: List[str] = []
-    fd = state.get("financial_data") or DEFAULT_FINANCIAL_DATA
+    fd = state.get(FINANCIAL_DATA_KEY) or DEFAULT_FINANCIAL_DATA
     blocks.append(f"FINANCIAL DATA:\n{_safe_dumps(fd)}")
     for key in include_keys:
         value = state.get(key)
@@ -322,7 +330,7 @@ def _normalize_category(key: str) -> str:
 
 
 def _ensure_financial_data(tool_context: ToolContext) -> Dict[str, Any]:
-    fd = tool_context.state.get("financial_data")
+    fd = tool_context.state.get(FINANCIAL_DATA_KEY)
     if not isinstance(fd, dict):
         fd = dict(DEFAULT_FINANCIAL_DATA)
     fd.setdefault("monthly_income", 0)
@@ -409,7 +417,7 @@ def update_financial_data(
         if removed:
             changes.append(f"-{removed} debt(s) removed: {', '.join(remove_debt_names)}")
 
-    tool_context.state["financial_data"] = fd
+    tool_context.state[FINANCIAL_DATA_KEY] = fd
 
     return {
         "status": "updated",
@@ -476,14 +484,46 @@ coach_agent = LlmAgent(
 # ---------- ADK / FastAPI wiring ----------
 
 
+_USER_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
+
+
+def _user_id_from_input(input: RunAgentInput) -> str:
+    """Read the browser-generated user ID the frontend sends as a CopilotKit property."""
+    user_id = (input.forwarded_props or {}).get("userId")
+    if not isinstance(user_id, str) or not _USER_ID_PATTERN.match(user_id):
+        raise ValueError("Missing or invalid userId in forwarded props")
+    return user_id
+
+
+SESSION_DB_URL = os.getenv("SESSION_DB_URL", "sqlite+aiosqlite:///./data/sessions.db")
+os.makedirs("data", exist_ok=True)
+
 adk_finance_agent = ADKAgent(
     adk_agent=coach_agent,
-    user_id="demo_user",
+    user_id_extractor=_user_id_from_input,
     session_timeout_seconds=3600,
-    use_in_memory_services=True,
+    session_service=DatabaseSessionService(db_url=SESSION_DB_URL),
 )
 
 app = FastAPI(title="AI Financial Coach Agent")
+
+# ALLOWED_ORIGINS: comma-separated list of origins allowed to call this agent
+# directly (e.g. the deployed frontend's URL). Defaults to local dev origins.
+_allowed_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 add_adk_fastapi_endpoint(app, adk_finance_agent, path="/")
 
 

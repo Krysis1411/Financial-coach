@@ -116,7 +116,7 @@ export function FinancialForm({
               className="grid grid-cols-12 gap-2 bg-gray-50 rounded-xl p-3 items-center"
             >
               <input
-                className="col-span-3 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-offset-1"
+                className="col-span-3 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{ "--tw-ring-color": "#14b8a6" } as React.CSSProperties}
                 value={debt.name}
                 onChange={(e) => updateDebt(idx, { name: e.target.value })}
@@ -242,7 +242,7 @@ function NumberInput({
         min={0}
         value={Number.isFinite(value) ? value : 0}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className={`w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+        className={`w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300 ${
           prefix ? "pl-12" : ""
         } ${suffix ? "pr-8" : ""}`}
       />

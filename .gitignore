@@ -47,3 +47,4 @@ next-env.d.ts
 agent/venv/
 agent/__pycache__/
 agent/.venv/
+agent/data/__pycache__/

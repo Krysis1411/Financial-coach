@@ -15,6 +15,8 @@ const serviceAdapter = new ExperimentalEmptyAdapter();
 const runtime = new CopilotRuntime({
   agents: {
     // Our FastAPI endpoint URL
+    // @ts-expect-error — HttpAgent (from @ag-ui/client) is missing `pendingInterrupts`,
+    // which CopilotRuntime's AbstractAgent type requires; pending upstream fix.
     my_agent: new HttpAgent({
       url: process.env.AGENT_URL || "http://localhost:8000/",
     }),
